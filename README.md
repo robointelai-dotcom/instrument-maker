@@ -21,6 +21,7 @@ Everything runs in the browser. Nothing is uploaded.
 ## What it does
 
 1. **Record** in one of four ways:
+   - A demo of guided recording that needs no microphone.
    - Guided recording: learns the room for 3 seconds, shows which note to
      play, starts and stops by itself, and checks the key was the right one.
      Plans: any notes; piano 5 / 15 / 30 notes; app instrument, violin or

@@ -144,7 +144,8 @@ footer { color: var(--muted); font-size: 0.85rem; }
       </select>
     </label>
     <button type="button" class="primary" id="btn-guide">Start guided recording</button>
-    <p class="status">Guided recording tells you what to play, and stops by itself after each note.</p>
+    <button type="button" id="btn-demo">Watch a demo of guided recording</button>
+    <p class="status">Guided recording tells you what to play, and stops by itself after each note. The demo shows the screens with made-up notes, without the microphone.</p>
     <button type="button" class="rec" id="btn-rec"><span class="dot"></span><span id="rec-label">Record freely with the microphone</span></button>
     <div class="meter" aria-hidden="true"><i id="level"></i></div>
     <div class="row">
@@ -201,6 +202,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
 
 <div class="guide" id="guide" role="dialog" aria-modal="true" aria-labelledby="g-say" hidden>
   <div class="in">
+    <p class="banner" id="g-demo" hidden>Demo with made-up notes. Nothing is recorded.</p>
     <p class="g-step" id="g-step"></p>
     <p class="g-big" id="g-big"></p>
     <div class="g-ringbox" id="g-ring">
@@ -342,7 +344,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
     }).catch(micBlocked);
   }
   function micBlocked() {
-    setStatus("rec-status", "The microphone is not available on this page, so guided and free recording cannot run here. Use one of the two buttons below it.", true);
+    setStatus("rec-status", "The microphone is not available on this page, so guided and free recording cannot run here. Press “Watch a demo” to see the guided screens, or use the phone recorder or file buttons.", true);
   }
   $("btn-rec").addEventListener("click", function () { if (state.recording) stopMic(); else startMic(); });
 
@@ -402,8 +404,11 @@ footer { color: var(--muted); font-size: 0.85rem; }
       $("g-say").textContent = "That was " + Core.noteName(take.midi) + ". Play " + Core.noteName(t) + ".";  $("g-heard").textContent = "";
       gRing("bad", 1, Core.noteName(take.midi), "wrong key"); gSettle(1600); return;
     }
-    if (state.example) { state.takes = []; state.example = false; }
-    state.takes.push(take); state.snrDb = a.snrDb; G.got++;
+    if (!G.demo) {
+      if (state.example) { state.takes = []; state.example = false; }
+      state.takes.push(take); state.snrDb = a.snrDb;
+    }
+    G.got++;
     $("g-heard").textContent = take.seconds.toFixed(1) + " s kept" + (G.clipped ? ". It was too loud: move the phone back a little." : "");
     G.clipped = false;
     gRing("good", 1, "✓", Core.noteName(take.midi));
@@ -463,9 +468,11 @@ footer { color: var(--muted); font-size: 0.85rem; }
   function gStop() {
     var g = G; G = null;
     if (!g) return;
-    try { g.proc.disconnect(); g.src.disconnect(); g.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    if (g.demo) { clearInterval(g.timer); try { g.player.stop(); } catch (e) {} }
+    else try { g.proc.disconnect(); g.src.disconnect(); g.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
     try { if (g.lock) g.lock.release(); } catch (e) {}
     $("guide").hidden = true; document.body.style.overflow = "";
+ if (g.demo) { setStatus("rec-status", "Demo finished. Nothing was recorded."); $("btn-demo").focus(); return; }
     setStatus("rec-status", g.got ? "Guided recording finished: " + g.got + " note" + (g.got === 1 ? "" : "s") + " kept." : "Guided recording stopped. No notes were kept.");
     render(); $("btn-guide").focus();
   }
@@ -479,12 +486,49 @@ footer { color: var(--muted); font-size: 0.85rem; }
       proc.onaudioprocess = function (e) { gBlock(e.inputBuffer.getChannelData(0)); };
       src.connect(proc); proc.connect(ctx.destination);
       try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { if (G) G.lock = l; else l.release(); }).catch(function () {}); } catch (e) {}
-      $("g-step").textContent = "First, the room"; $("g-big").textContent = "Stay quiet";
-      $("g-say").textContent = "Do not play yet. Learning the sound of the room so it can be removed.";
-      $("g-heard").textContent = ""; $("g-skip").hidden = true; gRing("room", 0, "3", "seconds"); gDots();
-      $("guide").hidden = false; document.body.style.overflow = "hidden"; $("g-stop").focus();
+      gOpen();
     }).catch(micBlocked);
   }
+  function gOpen() {
+    $("g-demo").hidden = !G.demo;
+    $("g-step").textContent = "First, the room"; $("g-big").textContent = "Stay quiet";
+    $("g-say").textContent = "Do not play yet. Learning the sound of the room so it can be removed.";
+    $("g-heard").textContent = ""; $("g-skip").hidden = true; gRing("room", 0, "3", "seconds"); gDots();
+    $("guide").hidden = false; document.body.style.overflow = "hidden"; $("g-stop").focus();
+  }
+  /* the demo runs the same screens on made-up sound: the room, a right note, a wrong key, the retry, one more */
+  function gDemo() {
+    if (state.recording || G) return;
+    var ctx = audio(), sr = ctx.sampleRate, key = $("plan").value, held = !!HELD[key];
+    var full = PLANS[key] || [60, 64, 67], mid = Math.max(0, (full.length >> 1) - 1), plan = full.slice(mid, mid + 3),   /* three notes from the middle, so a phone speaker can play them */
+        seq = [plan[0], plan[1] + 2, plan[1], plan[2]], parts = [], total = 0, seed = 11;
+    function add(a) { parts.push(a); total += a.length; }
+    function tone(m) {
+      var f = 440 * Math.pow(2, (m - 69) / 12), d = held ? 4.2 : 3.4, n = Math.round(sr * d), x = new Float32Array(n);
+      for (var j = 0; j < n; j++) {
+        var t = j / sr, s = 0;
+        for (var h = 1; h <= 6; h++) { if (f * h > sr / 2.2) break; s += Math.sin(2 * Math.PI * f * h * t) * (held ? 1 / (h * h) : Math.exp(-t * (1.4 + h * 0.6)) / h); }
+        x[j] = (held ? 0.25 * Math.min(1, t / 0.03) * Math.min(1, (d - t) / 0.15) : 0.4 * Math.min(1, t / 0.004)) * s;
+      }
+      return x;
+    }
+    add(new Float32Array(Math.round(sr * 3.4)));
+    seq.forEach(function (m) { add(new Float32Array(Math.round(sr * 1.6))); add(tone(m)); add(new Float32Array(Math.round(sr * 2.6))); });
+    var x = join(parts), i;
+    for (i = 0; i < total; i++) { seed = (seed * 1664525 + 1013904223) >>> 0; x[i] += (seed / 4294967296 - 0.5) * 0.004; }
+    var buf = ctx.createBuffer(1, total, sr), player = ctx.createBufferSource(), pos = 0, t0 = ctx.currentTime, w0 = Date.now();
+    buf.getChannelData(0).set(x); player.buffer = buf; player.connect(ctx.destination);
+    try { player.start(); } catch (e) {}
+    G = { demo: true, player: player, sr: sr, plan: plan, held: held, idx: 0, got: 0, marks: [], phase: "room", room: [], roomR: [], t: 0, note: [], pre: [] };
+    G.timer = setInterval(function () {
+      if (!G || !G.demo) return;
+      var now = ctx.state === "running" ? ctx.currentTime - t0 : (Date.now() - w0) / 1000, upto = Math.min(total, Math.round(now * sr)), n = 0;
+      while (G && pos + 2048 <= upto && n++ < 8) { gBlock(x.subarray(pos, pos + 2048)); pos += 2048; }
+      if (G && pos + 2048 > total) gStop();
+    }, 40);
+    gOpen();
+  }
+  $("btn-demo").addEventListener("click", gDemo);
   $("btn-guide").addEventListener("click", gStart);
   $("g-stop").addEventListener("click", gStop);
   $("g-skip").addEventListener("click", function () {
