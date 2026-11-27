@@ -33,7 +33,8 @@ Everything runs in the browser. Nothing is uploaded.
 2. **Check**: a strip of keys shows which are real recordings and which are
    filled in from the nearest one. Tap a key to hear it.
 3. **Download**: `<name>.zip` containing `samples/*.wav` (24-bit mono) and
-   four SFZ files: Natural, Warm, Bright, Soft.
+   five SFZ files: Natural, Warm, Bright, Soft, Vibrato (the player
+   adds the vibrato, so it is the same speed on every key).
 
 ## Limits
 

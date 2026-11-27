@@ -192,7 +192,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
 
   <section aria-labelledby="h-dl">
     <h2 id="h-dl"><span class="n">3</span>Download the instrument</h2>
-    <p>A ZIP file with the samples and four SFZ files made from them: Natural, Warm, Bright and Soft.</p>
+    <p>A ZIP file with the samples and five SFZ files made from them: Natural, Warm, Bright, Soft and Vibrato.</p>
     <button type="button" class="primary" id="btn-dl">Download the instrument (.zip)</button>
     <p class="status" id="dl-status" role="status"></p>
   </section>
@@ -413,7 +413,9 @@ var Core = (function () {
     natural: { label: "Natural", lines: [] },
     warm: { label: "Warm", lines: ["fil_type=lpf_2p cutoff=3200 resonance=0"] },
     bright: { label: "Bright", lines: ["eq1_freq=5500 eq1_bw=2 eq1_gain=6"] },
-    soft: { label: "Soft", lines: ["ampeg_attack=0.04 volume=-3", "fil_type=lpf_2p cutoff=5000 resonance=0"] }
+    soft: { label: "Soft", lines: ["ampeg_attack=0.04 volume=-3", "fil_type=lpf_2p cutoff=5000 resonance=0"] },
+    /* vibrato made by the player: same speed on every key, starting a moment after the note, as a string player does */
+    vibrato: { label: "Vibrato", lines: ["pitchlfo_freq=5.5 pitchlfo_depth=18", "pitchlfo_delay=0.25 pitchlfo_fade=0.35"] }
   };
   function layout(takes, reach) {
     var by = {};
@@ -463,18 +465,18 @@ var Core = (function () {
     var made = opts.date || new Date().toISOString().slice(0, 10);
     Object.keys(TONES).forEach(function (key) {
       var t = TONES[key];
-      var txt = ["// " + name + " (" + t.label + ")", "// Made with Instrument Maker on " + made + " from the owner's own recording.",
+      var txt = ["// " + name + " (" + t.label + ")", "// Made with Instrument Maker on " + made + " from the recording given to it.",
         "// " + zones.length + " recorded notes, " + used.length + " samples.", "", "<control>", "default_path=samples/", "",
         "<global>", "ampeg_release=0.35 amp_veltrack=85"].concat(t.lines).concat(["", "<group>"]).concat(regions).join("\r\n") + "\r\n";
       files.push({ name: name + "/" + name + (key === "natural" ? "" : " - " + t.label) + ".sfz", bytes: utf8(txt) });
     });
     var q = keyQuality(zones), far = Object.keys(q).filter(function (k) { return q[k] === "far"; }).length;
-    var readme = [name, "", "Made with Instrument Maker on " + made + ".", "Every sample in this folder was recorded by the owner. Nothing here comes from another sample library.", "",
+    var readme = [name, "", "Made with Instrument Maker on " + made + ".", "The samples were cut from the recording given to Instrument Maker.", "If that recording was of another company's app or sound library, its licence still applies: keep this instrument for your own use.", "",
       "Recorded notes: " + zones.map(function (z) { return noteName(z.midi) + (z.layers.reduce(function (s, l) { return s + l.length; }, 0) > 1 ? " x" + z.layers.reduce(function (s, l) { return s + l.length; }, 0) : ""); }).join(", "),
       "Keys covered: " + (zones.length ? noteName(zones[0].lo) + " to " + noteName(zones[zones.length - 1].hi) : "none"),
       "Keys more than 4 semitones from a recorded note: " + far + (far ? " (record notes near them for a better sound)" : ""), "",
       "To use: keep this folder together and open the .sfz file in any SFZ player (sfizz, Sforzando) or Backing Studio.",
-      "Files: " + name + ".sfz (natural), and Warm, Bright and Soft versions made from the same samples."].join("\r\n") + "\r\n";
+      "Files: " + name + ".sfz (natural), and Warm, Bright, Soft and Vibrato versions made from the same samples."].join("\r\n") + "\r\n";
     files.push({ name: name + "/README.txt", bytes: utf8(readme) });
     return { name: name, files: files, zones: zones, quality: q, samples: used.length, far: far };
   }
