@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instrument Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one narrow column for a phone held in one hand; three numbered steps, the record button the largest thing on screen. */
+:root {
+  --paper: #f3f5f2; --card: #ffffff; --ink: #14201d; --muted: #586662; --line: #d5dcd8;
+  --accent: #0d6b5c; --accent-ink: #ffffff; --rec: #c8322b;
+  --real: #0d6b5c; --near: #5fa896; --ok: #d9a63a; --far: #c8322b;
+  --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", Arial, sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0f1716; --card: #18221f; --ink: #e8efec; --muted: #9db0aa; --line: #2c3b37;
+    --accent: #4fc4ae; --accent-ink: #06231d; --rec: #ff6a60;
+    --real: #4fc4ae; --near: #2f8573; --ok: #e0b24a; --far: #ff6a60;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f1716; --card: #18221f; --ink: #e8efec; --muted: #9db0aa; --line: #2c3b37;
+  --accent: #4fc4ae; --accent-ink: #06231d; --rec: #ff6a60;
+  --real: #4fc4ae; --near: #2f8573; --ok: #e0b24a; --far: #ff6a60;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.45; }
+main { max-width: 34rem; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+h1 { font-family: var(--display); font-size: 2rem; line-height: 1.05; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-size: 1.25rem; margin: 0; display: flex; align-items: baseline; gap: 10px; text-wrap: balance; }
+h2 .n { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 999px; width: 1.7rem; height: 1.7rem; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+p { margin: 0; }
+.lede { color: var(--muted); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+label { font-weight: 700; font-size: 0.9rem; display: flex; flex-direction: column; gap: 6px; }
+input[type="text"], select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; width: 100%; }
+button { font: inherit; font-weight: 700; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); padding: 14px 16px; min-height: 52px; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.rec { background: var(--rec); color: #fff; border-color: var(--rec); font-size: 1.15rem; min-height: 68px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+button.rec .dot { width: 16px; height: 16px; border-radius: 50%; background: #fff; flex: none; }
+button.rec.on .dot { border-radius: 3px; }
+button:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 10rem; min-width: 0; }
+.check { flex-direction: row; align-items: center; gap: 10px; font-weight: 400; font-size: 1rem; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.tips { margin: 0; padding-left: 1.2rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; font-size: 0.95rem; }
+.meter { height: 14px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+.status { font-size: 0.95rem; color: var(--muted); min-height: 1.4em; }
+.status.bad { color: var(--rec); font-weight: 700; }
+.banner { border-left: 4px solid var(--ok); background: var(--paper); border-radius: 8px; padding: 10px 12px; font-size: 0.95rem; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fact { background: var(--paper); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fact b { font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fact span { font-size: 0.8rem; color: var(--muted); }
+.keys { overflow-x: auto; padding-bottom: 6px; }
+.keys .strip { display: flex; gap: 3px; width: max-content; }
+.key { width: 34px; height: 84px; border-radius: 6px; border: 0; padding: 4px 0; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-family: var(--mono); font-size: 0.62rem; font-weight: 700; color: #fff; }
+.key.real { background: var(--real); height: 96px; }
+.key.near { background: var(--near); }
+.key.ok { background: var(--ok); color: #1d1503; }
+.key.far { background: var(--far); }
+.key.sharp { opacity: 0.82; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.takes { display: flex; flex-direction: column; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.takes li { display: flex; align-items: center; gap: 8px; background: var(--paper); border-radius: 10px; padding: 6px 6px 6px 12px; }
+.takes .nm { font-family: var(--mono); font-weight: 700; width: 3.2rem; flex: none; }
+.takes .info { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--muted); }
+.takes li.unclear .nm { color: var(--rec); }
+.takes button { min-height: 44px; padding: 8px 12px; flex: none; }
+.advice { font-size: 0.95rem; }
+footer { color: var(--muted); font-size: 0.85rem; }
+.guide { position: fixed; inset: 0; z-index: 10; background: var(--paper); overflow-y: auto; }
+.guide .in { max-width: 30rem; min-height: 100%; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.g-step { font-family: var(--mono); font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
+.g-big { font-family: var(--display); font-size: 3.4rem; line-height: 1; min-height: 1em; }
+.g-ringbox { position: relative; width: 210px; height: 210px; flex: none; }
+.g-ringbox svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.g-ringbox .track { fill: none; stroke: var(--line); stroke-width: 9; }
+.g-ringbox .prog { fill: none; stroke: var(--accent); stroke-width: 9; stroke-linecap: round; }
+.g-ringbox .core { position: absolute; inset: 26px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.g-ringbox .core b { font-family: var(--mono); font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.g-ringbox .core span { font-size: 0.85rem; color: var(--muted); }
+.g-ringbox.note .prog { stroke: var(--rec); }
+.g-ringbox.note .core { border-color: var(--rec); }
+.g-ringbox.good .prog { stroke: var(--real); }
+.g-ringbox.good .core { background: var(--real); color: var(--accent-ink); border-color: var(--real); }
+.g-ringbox.good .core span { color: var(--accent-ink); }
+.g-ringbox.bad .prog { stroke: var(--far); }
+.g-ringbox.bad .core { border-color: var(--far); }
+.g-say { font-size: 1.15rem; font-weight: 700; min-height: 3em; text-wrap: balance; }
+.g-heard { font-family: var(--mono); color: var(--muted); min-height: 1.4em; }
+.guide .meter { width: 100%; }
+.g-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.g-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.g-dots i.done { background: var(--real); }
+.g-dots i.skip { background: var(--ok); }
+.g-dots i.now { outline: 2px solid var(--ink); outline-offset: 1px; }
+.guide .row { width: 100%; margin-top: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .g-ringbox .prog { transition: stroke-dashoffset 120ms linear; }
+  .g-ringbox.listen .core { animation: breathe 1.6s ease-in-out infinite; }
+  .g-ringbox.good .core { animation: pop 320ms ease-out; }
+  @keyframes breathe { 50% { transform: scale(1.06); border-color: var(--accent); } }
+  @keyframes pop { 0% { transform: scale(0.85); } 70% { transform: scale(1.08); } }
+}
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: no-preference) { .meter i { transition: width 80ms linear; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Instrument Maker</h1>
+    <p class="lede">Play a few notes. Get an instrument that covers every key, made only from your own recording.</p>
+  </header>
+
+  <section aria-labelledby="h-rec">
+    <h2 id="h-rec"><span class="n">1</span>Record your notes</h2>
+    <label for="inst-name">Name of the instrument
+      <input type="text" id="inst-name" value="My Instrument" maxlength="40" autocomplete="off">
+    </label>
+    <label for="plan">What will you record?
+      <select id="plan">
+        <option value="any" selected>Any notes I choose</option>
+        <option value="m5">App instrument, violin or flute: 5 notes (quick test)</option>
+        <option value="vn">Violin range, G3 to E6: 12 notes</option>
+        <option value="hi">High instrument or flute, C4 to C7: 13 notes</option>
+        <option value="lo">Low instrument or bass, E1 to G3: 10 notes</option>
+        <option value="p5">Piano: 5 notes (quick test)</option>
+        <option value="p15">Piano: 15 notes (good)</option>
+        <option value="p30">Piano: 30 notes (best)</option>
+      </select>
+    </label>
+    <button type="button" class="primary" id="btn-guide">Start guided recording</button>
+    <p class="status">Guided recording tells you what to play, and stops by itself after each note.</p>
+    <button type="button" class="rec" id="btn-rec"><span class="dot"></span><span id="rec-label">Record freely with the microphone</span></button>
+    <div class="meter" aria-hidden="true"><i id="level"></i></div>
+    <div class="row">
+      <button type="button" id="btn-file">Use the phone recorder</button>
+      <button type="button" id="btn-pick">Choose a recording or video</button>
+    </div>
+    <input type="file" id="file" accept="audio/*" capture hidden>
+    <input type="file" id="pick" accept="audio/*,video/*" hidden>
+    <label class="check" for="clean"><input type="checkbox" id="clean" checked>Remove background noise</label>
+    <p class="status" id="rec-status" role="status">Ready.</p>
+    <ul class="tips">
+      <li>Play one note at a time and let it ring until it stops.</li>
+      <li>Leave two seconds of silence between notes. The silence is how the noise is learned.</li>
+      <li>Any notes, any order. You can record again to add more.</li>
+      <li>Sampling an app on this device? Screen-record it with sound, then choose that video here.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-notes">
+    <h2 id="h-notes"><span class="n">2</span>Check your notes</h2>
+    <p class="banner" id="example-note">This is an example made from five generated notes, so you can try the keys. Your first recording replaces it.</p>
+    <div class="facts">
+      <div class="fact"><b id="f-notes">0</b><span>notes recorded</span></div>
+      <div class="fact"><b id="f-range">–</b><span>keys covered</span></div>
+      <div class="fact"><b id="f-noise">–</b><span>room noise</span></div>
+    </div>
+    <div class="keys" id="keys" aria-label="Keys of the instrument. Tap a key to hear it."><div class="strip" id="strip"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--real)"></i>your recording</span>
+      <span><i style="background:var(--near)"></i>1–2 keys away</span>
+      <span><i style="background:var(--ok)"></i>3–4 keys away</span>
+      <span><i style="background:var(--far)"></i>further: record a note here</span>
+    </div>
+    <p class="advice" id="advice"></p>
+    <label for="reach">Keys to add below the lowest and above the highest note
+      <select id="reach">
+        <option value="5" selected>5 keys (sounds natural)</option>
+        <option value="12">12 keys (one octave)</option>
+        <option value="127">The whole keyboard</option>
+      </select>
+    </label>
+    <ul class="takes" id="takes"></ul>
+  </section>
+
+  <section aria-labelledby="h-dl">
+    <h2 id="h-dl"><span class="n">3</span>Download the instrument</h2>
+    <p>A ZIP file with the samples and four SFZ files made from them: Natural, Warm, Bright and Soft.</p>
+    <button type="button" class="primary" id="btn-dl">Download the instrument (.zip)</button>
+    <p class="status" id="dl-status" role="status"></p>
+  </section>
+
+  <footer>Recordings stay on this device. Nothing is uploaded.</footer>
+</main>
+
+<div class="guide" id="guide" role="dialog" aria-modal="true" aria-labelledby="g-say" hidden>
+  <div class="in">
+    <p class="g-step" id="g-step"></p>
+    <p class="g-big" id="g-big"></p>
+    <div class="g-ringbox" id="g-ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle class="prog" id="g-prog" cx="60" cy="60" r="54"/></svg>
+      <div class="core"><b id="g-sec"></b><span id="g-unit"></span></div>
+    </div>
+    <p class="g-say" id="g-say" role="status"></p>
+    <p class="g-heard" id="g-heard"></p>
+    <div class="meter" aria-hidden="true"><i id="g-level"></i></div>
+    <div class="g-dots" id="g-dots" aria-hidden="true"></div>
+    <div class="row">
+      <button type="button" id="g-skip">Skip this note</button>
+      <button type="button" class="primary" id="g-stop">Finish</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/*CORE*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { takes: [], example: true, noiseDb: null, snrDb: null, recording: null, ctx: null };
+
+  function audio() {
+    if (!state.ctx) { var AC = window.AudioContext || window.webkitAudioContext; state.ctx = new AC(); }
+    if (state.ctx.state === "suspended") state.ctx.resume();
+    return state.ctx;
+  }
+  function setStatus(id, text, bad) { var el = $(id); el.textContent = text; el.className = "status" + (bad ? " bad" : ""); }
+
+  /* ----- playing a key: the nearest take, shifted to the key ----- */
+  function play(take, key) {
+    try {
+      var ctx = audio(), buf = ctx.createBuffer(1, take.data.length, take.sr);
+      buf.getChannelData(0).set(take.data);
+      var src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = buf;
+      src.playbackRate.value = Math.pow(2, (key - take.midi) / 12 - take.cents / 1200);
+      g.gain.value = Math.min(4, 0.8 / Math.max(take.peak, 0.02));
+      src.connect(g); g.connect(ctx.destination); src.start();
+    } catch (e) { setStatus("dl-status", "This device could not play the sound.", true); }
+  }
+
+  /* ----- drawing ----- */
+  function reach() { return parseInt($("reach").value, 10); }
+  function render() {
+    var zones = Core.layout(state.takes, reach()), q = Core.keyQuality(zones), strip = $("strip");
+    strip.textContent = "";
+    zones.forEach(function (z) {
+      for (var k = z.lo; k <= z.hi; k++) {
+        if (reach() === 127 && (k < 21 || k > 108)) continue;
+        var b = document.createElement("button"), nm = Core.noteName(k);
+        b.type = "button"; b.className = "key " + q[k] + (nm.indexOf("#") > 0 ? " sharp" : "");
+        b.textContent = nm; b.setAttribute("aria-label", "Play " + nm);
+        b.addEventListener("click", (function (zone, key) { return function () { var l = zone.layers[zone.layers.length - 1]; play(l[0], key); }; })(z, k));
+        strip.appendChild(b);
+      }
+    });
+    var good = state.takes.filter(function (t) { return t.ok; });
+    $("f-notes").textContent = String(zones.length);
+    $("f-range").textContent = zones.length ? Core.noteName(zones[0].lo) + "–" + Core.noteName(zones[zones.length - 1].hi) : "–";
+    $("f-noise").textContent = state.snrDb == null ? "–" : state.snrDb >= 45 ? "Quiet" : state.snrDb >= 30 ? "Some" : "Too much";
+    $("example-note").hidden = !state.example;
+    /* the widest gap between recorded notes is the next note to record */
+    var advice = "";
+    if (!zones.length) advice = "No clear notes yet. Record one note at a time, close to the microphone.";
+    else {
+      var gap = 0, at = null;
+      for (var i = 1; i < zones.length; i++) { var d = zones[i].midi - zones[i - 1].midi; if (d > gap) { gap = d; at = Math.round((zones[i].midi + zones[i - 1].midi) / 2); } }
+      if (gap > 8) advice = "Widest gap: record a note near " + Core.noteName(at) + " to improve the keys around it.";
+      else if (zones.length < 4) advice = "Record a few more notes, spread from low to high, for a fuller instrument.";
+      else advice = "Good coverage. Every key is within " + Math.ceil(Math.max(gap, 1) / 2) + " keys of a recording.";
+      if (state.snrDb != null && state.snrDb < 30) advice += " The room is noisy: move closer to the instrument or find a quieter place.";
+    }
+    $("advice").textContent = advice;
+    var list = $("takes"); list.textContent = "";
+    state.takes.forEach(function (t, idx) {
+      var li = document.createElement("li"), nm = document.createElement("span"), info = document.createElement("span"), p = document.createElement("button"), x = document.createElement("button");
+      li.className = t.ok ? "" : "unclear";
+      nm.className = "nm"; nm.textContent = t.ok ? Core.noteName(t.midi) : "?";
+      info.className = "info";
+      info.textContent = t.ok ? t.seconds.toFixed(1) + " s" + (Math.abs(t.cents) > 15 ? ", " + Math.abs(t.cents) + " cents " + (t.cents > 0 ? "sharp" : "flat") + " (corrected)" : "") : "Not a clear single note. It will be left out.";
+      p.type = "button"; p.textContent = "Play"; p.setAttribute("aria-label", "Play this take");
+      p.addEventListener("click", function () { play({ data: t.data, sr: t.sr, midi: t.midi || 60, cents: 0, peak: t.peak }, t.midi || 60); });
+      x.type = "button"; x.textContent = "Remove"; x.setAttribute("aria-label", "Remove this take");
+      x.addEventListener("click", function () { state.takes.splice(idx, 1); render(); });
+      li.appendChild(nm); li.appendChild(info); li.appendChild(p); li.appendChild(x); list.appendChild(li);
+    });
+    $("btn-dl").disabled = good.length === 0;
+  }
+
+  /* ----- a new recording ----- */
+  function addRecording(x, sr) {
+    setStatus("rec-status", "Finding your notes…");
+    setTimeout(function () {
+      try {
+        var a = Core.analyse(x, sr, $("clean").checked);
+        if (state.example) { state.takes = []; state.example = false; }
+        state.takes = state.takes.concat(a.takes);
+        state.snrDb = a.snrDb;
+        var ok = a.takes.filter(function (t) { return t.ok; }).length;
+        setStatus("rec-status", a.takes.length ? "Found " + ok + " clear note" + (ok === 1 ? "" : "s") + (a.takes.length > ok ? " and " + (a.takes.length - ok) + " unclear sound" + (a.takes.length - ok === 1 ? "" : "s") : "") + "." + (a.noiseLearned ? "" : " Too little silence to learn the room's noise, so it was not removed.") : "No notes found. Play louder or closer, one note at a time.", !a.takes.length);
+        render();
+      } catch (e) { setStatus("rec-status", "The recording could not be read. Try again.", true); }
+    }, 30);
+  }
+
+  /* ----- microphone ----- */
+  function stopMic() {
+    var r = state.recording; state.recording = null;
+    if (!r) return;
+    try { r.proc.disconnect(); r.src.disconnect(); r.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    $("btn-rec").classList.remove("on"); $("rec-label").textContent = "Record freely with the microphone"; $("level").style.width = "0";
+    var n = r.chunks.reduce(function (s, c) { return s + c.length; }, 0), x = new Float32Array(n), o = 0;
+    r.chunks.forEach(function (c) { x.set(c, o); o += c.length; });
+    if (n < r.sr * 0.5) { setStatus("rec-status", "That was too short. Record at least one whole note.", true); return; }
+    addRecording(x, r.sr);
+  }
+  function startMic() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micBlocked(); return; }
+    var ctx = audio();
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } }).then(function (stream) {
+      var src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [], t0 = Date.now();
+      proc.onaudioprocess = function (e) {
+        var d = e.inputBuffer.getChannelData(0), pk = 0;
+        chunks.push(new Float32Array(d));
+        for (var i = 0; i < d.length; i += 16) { var v = Math.abs(d[i]); if (v > pk) pk = v; }
+        $("level").style.width = Math.min(100, Math.round(Math.sqrt(pk) * 110)) + "%";
+        var s = Math.floor((Date.now() - t0) / 1000);
+        $("rec-status").textContent = "Recording " + Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2) + (pk > 0.98 ? ". Too loud: move the phone back." : ". Play your notes, then press Stop.");
+      };
+      src.connect(proc); proc.connect(ctx.destination);
+      state.recording = { stream: stream, src: src, proc: proc, chunks: chunks, sr: ctx.sampleRate };
+      $("btn-rec").classList.add("on"); $("rec-label").textContent = "Stop";
+      setStatus("rec-status", "Recording. Play your notes, then press Stop.");
+    }).catch(micBlocked);
+  }
+  function micBlocked() {
+    setStatus("rec-status", "The microphone is not available on this page, so guided and free recording cannot run here. Use one of the two buttons below it.", true);
+  }
+  $("btn-rec").addEventListener("click", function () { if (state.recording) stopMic(); else startMic(); });
+
+  /* ----- guided recording: learn the room, then one note at a time, stopping by itself ----- */
+  var PLANS = { p5: [36, 48, 60, 72, 84], p15: [], p30: [], m5: [48, 55, 62, 69, 76], vn: [], hi: [], lo: [] }, G = null, RING = 2 * Math.PI * 54, pk;
+  for (pk = 24; pk <= 108; pk += 6) PLANS.p15.push(pk);      /* every C and F sharp */
+  for (pk = 21; pk <= 108; pk += 3) PLANS.p30.push(pk);      /* every A, C, D sharp and F sharp */
+  for (pk = 55; pk <= 88; pk += 3) PLANS.vn.push(pk);
+  for (pk = 60; pk <= 96; pk += 3) PLANS.hi.push(pk);
+  for (pk = 28; pk <= 55; pk += 3) PLANS.lo.push(pk);
+  var ROOM_MS = 3000, HOLD_MS = 3000, HELD = { m5: 1, vn: 1, hi: 1, lo: 1 };   /* notes that last until you let go */
+
+  function join(chunks) {
+    var n = chunks.reduce(function (s, c) { return s + c.length; }, 0), x = new Float32Array(n), o = 0;
+    chunks.forEach(function (c) { x.set(c, o); o += c.length; });
+    return x;
+  }
+  function gRing(mode, frac, sec, unit) {
+    $("g-ring").className = "g-ringbox " + mode;
+    $("g-prog").style.strokeDasharray = RING;
+    $("g-prog").style.strokeDashoffset = RING * (1 - Math.max(0, Math.min(1, frac)));
+    $("g-sec").textContent = sec; $("g-unit").textContent = unit;
+  }
+  function gDots() {
+    var box = $("g-dots"); box.textContent = "";
+    if (!G.plan) return;
+    G.plan.forEach(function (m, i) { var d = document.createElement("i"); d.className = (G.marks[i] || "") + (i === G.idx ? " now" : ""); box.appendChild(d); });
+  }
+  function gTarget() { return G.plan ? G.plan[G.idx] : null; }
+  function gPrompt() {
+    var t = gTarget();
+    $("g-step").textContent = G.plan ? "Note " + (G.idx + 1) + " of " + G.plan.length : G.got + " note" + (G.got === 1 ? "" : "s") + " kept so far";
+    $("g-big").textContent = t != null ? Core.noteName(t) : "Any note";
+    $("g-say").textContent = t == null ? "Play one note. Hold it for 3 seconds, or let it ring until it fades."
+      : G.held ? "Play " + Core.noteName(t) + ". One finger, no sliding. Hold it steady for 3 seconds."
+      : "Press " + Core.noteName(t) + " once and hold it until the sound fades.";
+    $("g-heard").textContent = "Listening…";
+    $("g-skip").hidden = !G.plan;
+    gRing("listen", 0, "♪", "play now"); gDots();
+  }
+  function gSettle(ms) { G.phase = "settle"; G.q = 0; G.until = Date.now() + ms; G.pre = []; }
+  function gCheck() {
+    if (!G) return;
+    var a, take = null, t = gTarget();
+    try { a = Core.analyse(join([G.roomBuf].concat(G.note)), G.sr, $("clean").checked); } catch (e) { a = { takes: [] }; }
+    a.takes.forEach(function (k) { if (!take || k.seconds > take.seconds) take = k; });
+    G.note = [];
+    if (take && take.ok && G.t > 1500 && take.seconds < 0.6 * G.t / 1000) {      /* the capture dropped out and split the note */
+      $("g-say").textContent = "The recording skipped. Play it again."; $("g-heard").textContent = "";
+      gRing("bad", 1, "?", "again"); gSettle(1400); return;
+    }
+    if (!take || !take.ok) {
+      $("g-say").textContent = "That was not a clear single note. Play it again."; $("g-heard").textContent = "";
+      gRing("bad", 1, "?", "again"); gSettle(1400); return;
+    }
+    if (t != null && take.midi !== t) {
+      $("g-say").textContent = "That was " + Core.noteName(take.midi) + ". Play " + Core.noteName(t) + ".";  $("g-heard").textContent = "";
+      gRing("bad", 1, Core.noteName(take.midi), "wrong key"); gSettle(1600); return;
+    }
+    if (state.example) { state.takes = []; state.example = false; }
+    state.takes.push(take); state.snrDb = a.snrDb; G.got++;
+    $("g-heard").textContent = take.seconds.toFixed(1) + " s kept" + (G.clipped ? ". It was too loud: move the phone back a little." : "");
+    G.clipped = false;
+    gRing("good", 1, "✓", Core.noteName(take.midi));
+    if (G.plan) {
+      G.marks[G.idx] = "done"; G.idx++;
+      if (G.idx >= G.plan.length) { gDots(); $("g-say").textContent = "All " + G.plan.length + " notes are recorded."; G.phase = "done"; setTimeout(gStop, 1500); return; }
+      $("g-say").textContent = "Got " + Core.noteName(take.midi) + ". Stay quiet for a moment…";
+    } else $("g-say").textContent = "Got " + Core.noteName(take.midi) + ". Play another note, or press Finish.";
+    gSettle(1300);
+  }
+  function gBlock(d) {
+    if (!G) return;
+    var s = 0, i, top = 0, ms = d.length / G.sr * 1000;
+    for (i = 0; i < d.length; i++) { s += d[i] * d[i]; var v = d[i] < 0 ? -d[i] : d[i]; if (v > top) top = v; }
+    var r = Math.sqrt(s / d.length), copy = new Float32Array(d);
+    $("g-level").style.width = Math.min(100, Math.round(Math.sqrt(top) * 110)) + "%";
+    if (G.phase === "room") {
+      G.room.push(copy); G.roomR.push(r); G.t += ms;
+      gRing("room", G.t / ROOM_MS, String(Math.max(1, Math.ceil((ROOM_MS - G.t) / 1000))), "seconds");
+      if (G.t >= ROOM_MS) {
+        var sorted = G.roomR.slice().sort(function (a, b) { return a - b; });
+        G.noise = Math.max(sorted[sorted.length >> 1], 1e-4);
+        var all = join(G.room); G.roomBuf = all.subarray(Math.max(0, all.length - Math.round(G.sr * 2))); G.room = [];
+        G.phase = "listen"; G.pre = []; gPrompt();
+      }
+      return;
+    }
+    if (G.phase === "settle") {
+      if (r < Math.max(G.noise * 3, 0.006)) G.q += ms; else G.q = 0;
+      if (G.q >= 500 && Date.now() >= G.until) { G.phase = "listen"; G.pre = []; gPrompt(); }
+      return;
+    }
+    if (G.phase === "listen") {
+      G.pre.push(copy); if (G.pre.length > 8) G.pre.shift();
+      if (r > Math.max(G.noise * 5, 0.012)) {
+        G.phase = "note"; G.note = G.pre; G.pre = []; G.peak = r; G.t = 0; G.q = 0; G.n = 0; G.told = false; G.clipped = top > 0.98;
+        $("g-say").textContent = G.held ? "Recording. Hold it steady…" : "Recording. Keep holding. It stops by itself.";
+      }
+      return;
+    }
+    if (G.phase === "note") {
+      G.note.push(copy); G.t += ms; G.n++;
+      if (r > G.peak) G.peak = r;
+      if (top > 0.98) G.clipped = true;
+      if (G.held) {
+        gRing("note", G.t / HOLD_MS, G.t < HOLD_MS ? String(Math.ceil((HOLD_MS - G.t) / 1000)) : "✋", G.t < HOLD_MS ? "keep holding" : "let go");
+        if (G.t >= HOLD_MS && !G.told) { G.told = true; $("g-say").textContent = "Let go now."; }
+      } else gRing("note", r / G.peak, (G.t / 1000).toFixed(1), "seconds");
+      if (G.n % 5 === 2 && r > G.peak * 0.15 && d.length >= 2048) {
+        var p = Core.pitchAt(d, G.sr, 0, d.length);
+        if (p.clarity > 0.8 && p.hz > 0) $("g-heard").textContent = "Hearing " + Core.noteName(Math.round(69 + 12 * Math.log(p.hz / 440) / Math.LN2));
+      }
+      if (r < Math.max(G.noise * 2.5, G.peak * 0.012)) G.q += ms; else G.q = 0;   /* keep the tail until it reaches the room noise */
+      if ((G.t > 500 && G.q >= 350) || G.t > 20000) { G.phase = "check"; $("g-say").textContent = "Checking the note…"; setTimeout(gCheck, 20); }
+    }
+  }
+  function gStop() {
+    var g = G; G = null;
+    if (!g) return;
+    try { g.proc.disconnect(); g.src.disconnect(); g.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    try { if (g.lock) g.lock.release(); } catch (e) {}
+    $("guide").hidden = true; document.body.style.overflow = "";
+    setStatus("rec-status", g.got ? "Guided recording finished: " + g.got + " note" + (g.got === 1 ? "" : "s") + " kept." : "Guided recording stopped. No notes were kept.");
+    render(); $("btn-guide").focus();
+  }
+  function gStart() {
+    if (state.recording || G) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micBlocked(); return; }
+    var ctx = audio(), plan = PLANS[$("plan").value] || null, held = !!HELD[$("plan").value];
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } }).then(function (stream) {
+      var src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(2048, 1, 1);
+      G = { stream: stream, src: src, proc: proc, sr: ctx.sampleRate, plan: plan, held: held, idx: 0, got: 0, marks: [], phase: "room", room: [], roomR: [], t: 0, note: [], pre: [] };
+      proc.onaudioprocess = function (e) { gBlock(e.inputBuffer.getChannelData(0)); };
+      src.connect(proc); proc.connect(ctx.destination);
+      try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { if (G) G.lock = l; else l.release(); }).catch(function () {}); } catch (e) {}
+      $("g-step").textContent = "First, the room"; $("g-big").textContent = "Stay quiet";
+      $("g-say").textContent = "Do not play yet. Learning the sound of the room so it can be removed.";
+      $("g-heard").textContent = ""; $("g-skip").hidden = true; gRing("room", 0, "3", "seconds"); gDots();
+      $("guide").hidden = false; document.body.style.overflow = "hidden"; $("g-stop").focus();
+    }).catch(micBlocked);
+  }
+  $("btn-guide").addEventListener("click", gStart);
+  $("g-stop").addEventListener("click", gStop);
+  $("g-skip").addEventListener("click", function () {
+    if (!G || !G.plan || G.phase === "room" || G.phase === "check" || G.phase === "done") return;
+    G.marks[G.idx] = "skip"; G.idx++; G.note = [];
+    if (G.idx >= G.plan.length) { gStop(); return; }
+    gSettle(300); gPrompt(); G.phase = "settle";
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && G) gStop(); });
+
+  /* ----- phone recorder or a file ----- */
+  $("btn-file").addEventListener("click", function () { audio(); $("file").click(); });
+  $("btn-pick").addEventListener("click", function () { audio(); $("pick").click(); });
+  $("pick").addEventListener("change", readFile);
+  $("file").addEventListener("change", readFile);
+  function readFile() {
+    var f = this.files && this.files[0]; this.value = "";
+    if (!f) return;
+    setStatus("rec-status", "Reading the recording…");
+    var fr = new FileReader();
+    fr.onerror = function () { setStatus("rec-status", "The file could not be read.", true); };
+    fr.onload = function () {
+      var done = function (buf) {
+        var n = buf.length, x = new Float32Array(n), ch = buf.numberOfChannels;
+        for (var c = 0; c < ch; c++) { var d = buf.getChannelData(c); for (var i = 0; i < n; i++) x[i] += d[i] / ch; }
+        addRecording(x, buf.sampleRate);
+      }, fail = function () { setStatus("rec-status", "This file could not be opened. Use a WAV, M4A or MP3 recording, or an MP4 screen recording.", true); };
+      try { var p = audio().decodeAudioData(fr.result, done, fail); if (p && p.catch) p.catch(function () {}); } catch (e) { fail(); }
+    };
+    fr.readAsArrayBuffer(f);
+  }
+
+  /* ----- download ----- */
+  $("btn-dl").addEventListener("click", function () {
+    var inst;
+    try { inst = Core.buildInstrument(state.takes, { name: $("inst-name").value, reach: reach() }); }
+    catch (e) { setStatus("dl-status", "The instrument could not be built.", true); return; }
+    if (!inst.samples) { setStatus("dl-status", "Record at least one clear note first.", true); return; }
+    var bytes = Core.zip(inst.files), filename = inst.name.replace(/\s+/g, "_") + ".zip";
+    var said = inst.samples + " samples, " + inst.zones.length + " notes" + (inst.far ? ". " + inst.far + " keys are far from a recording and will sound less natural." : ".");
+    var direct = function () {
+      try {
+        var a = document.createElement("a"), url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+        a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        setStatus("dl-status", "Download started: " + said);
+      } catch (e) { setStatus("dl-status", "This page cannot save files here.", true); }
+    };
+    if (window.claude && typeof window.claude.use === "function") {
+      setStatus("dl-status", "Preparing the file…");
+      window.claude.use("downloads").then(function (d) {
+        if (!d) { direct(); return; }
+        return d.save({ filename: filename, data: new Blob([bytes]) }).then(function () { setStatus("dl-status", "Saved: " + said); });
+      }).catch(function (err) {
+        var c = err && err.code;
+        setStatus("dl-status", c === "declined" ? "Not saved. Press the button again when you are ready." : c === "host_unavailable" ? "This app cannot save files. Open the page in a browser to save the instrument." : c === "rate_limited" ? "Please wait a moment, then press the button again." : "The file could not be saved here.", c !== "declined");
+      });
+    } else direct();
+  });
+
+  $("reach").addEventListener("change", render);
+
+  /* ----- open with the example ----- */
+  try {
+    var ex = Core.analyse(Core.example(44100), 44100, true);
+    state.takes = ex.takes; state.snrDb = ex.snrDb;
+  } catch (e) {}
+  render();
+})();
+</script>
+</body>
+</html>
